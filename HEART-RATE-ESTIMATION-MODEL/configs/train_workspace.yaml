@@ -1,0 +1,84 @@
+project:
+  name: ppg_dalia_workspace_training
+  output_dir: runs/ppg_dalia_full_run
+
+seed: 42
+device: auto
+use_amp: true
+resume: null
+
+data:
+  dataset: PPG_DaLiA
+  data_root: data/raw/PPG_Dalia
+  prepared_dir: data/prepared/ppg_dalia
+  sampling_rate_hz: 64
+  window_seconds_options: [30, 25, 20]
+  window_sec: 30
+  step_sec: 15
+  val_fraction: 0.2
+  batch_size: 32
+  num_workers: 4
+  train_subjects: [S1, S2, S3, S4, S5, S6, S7, S8, S9, S10]
+  val_subjects: [S11, S12, S13]
+  test_subjects: [S14, S15]
+  max_windows: null
+
+preprocessing:
+  normalize: zscore
+  detrend: true
+  bandpass:
+    enabled: true
+    low_hz: 0.5
+    high_hz: 5.0
+    order: 3
+
+tinyppg:
+  model_dir: ../Tiny-PPG-master
+  checkpoint_path: ../Tiny-PPG-master/Save_Model/model_parameter-2023-5-31-1.pkl
+  threshold: 0.5
+  artifact_output_mode: artifact_probability
+  artifact_class_index: 1
+  require_checkpoint: true
+
+artifact_calibration:
+  thresholds: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+  max_windows: 128
+  warn_mean_removed_above: 70.0
+  warn_full_crop_above: 20.0
+  warn_too_short_above: 20.0
+
+cropper:
+  mode: crop
+  min_clean_samples: 128
+  min_output_samples: 128
+  empty_policy: keep_longest
+  mask_fill_value: 0.0
+
+model:
+  type: robust_cnn_gru
+  name: robust_hr_estimator
+  hidden_channels: 64
+  dropout: 0.15
+
+training:
+  max_epochs: 60
+  epochs: 60
+  batch_size: 32
+  learning_rate: 0.0005
+  weight_decay: 0.0001
+  loss: huber
+  huber_delta: 5.0
+  num_workers: 4
+  use_amp: true
+  resume: null
+  save_last_every_epoch: true
+  hr_checkpoint_dir: runs/ppg_dalia_full_run/checkpoints/baseline
+  framework_checkpoint_dir: runs/ppg_dalia_full_run/checkpoints/full_framework
+  max_train_batches: null
+  max_val_batches: null
+
+paths:
+  output_dir: runs/ppg_dalia_full_run
+  checkpoint_dir: runs/ppg_dalia_full_run/checkpoints
+  log_dir: runs/ppg_dalia_full_run/logs
+

@@ -100,6 +100,95 @@ Results are saved to:
 data/output/results.json
 ```
 
+## How to run on a capable workspace
+
+The training-ready PyTorch pipeline is separate from the older baseline runner:
+
+Raw PPG -> preprocessing -> frozen TinyPPG artifact detector -> crop noisy regions -> trainable HR estimator -> bpm.
+
+TinyPPG is loaded from `../Tiny-PPG-master` by default and stays frozen. Only the HR estimator is trained.
+
+Step 1: clone the repository.
+
+```bash
+git clone https://github.com/mekan-codes/Grad-Research.git
+cd Grad-Research/HEART-RATE-ESTIMATION-MODEL
+```
+
+Step 2: create an environment.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+On Windows:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Step 3: install requirements.
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Step 4: place PPG-DaLiA locally. The preparation script expects files like:
+
+```text
+data/raw/PPG_Dalia/S1/S1.pkl
+data/raw/PPG_Dalia/S2/S2.pkl
+...
+```
+
+The script does not download the dataset.
+
+Step 5: check readiness.
+
+```bash
+python scripts/check_training_ready.py --config configs/train_workspace.yaml --data-root /path/to/PPG_Dalia
+```
+
+Step 6: run full training.
+
+```bash
+python scripts/run_full_training_pipeline.py \
+  --config configs/train_workspace.yaml \
+  --data-root /path/to/PPG_Dalia \
+  --output-dir runs/ppg_dalia_full_run
+```
+
+On Windows:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_full_training_pipeline.py --config configs\train_workspace.yaml --data-root data\raw\PPG_Dalia --output-dir runs\ppg_dalia_full_run
+```
+
+Step 7: check outputs.
+
+```text
+runs/ppg_dalia_full_run/summary.md
+runs/ppg_dalia_full_run/metrics/
+runs/ppg_dalia_full_run/checkpoints/
+```
+
+Local smoke test:
+
+```bash
+python scripts/run_full_training_pipeline.py --config configs/smoke_test.yaml --smoke-only
+```
+
+TinyPPG output diagnostics:
+
+```bash
+python scripts/diagnose_tinyppg_output.py --config configs/train_workspace.yaml --input data/input/sample.csv --output-dir runs/tinyppg_diagnostic
+```
+
+All plotting scripts force the Matplotlib `Agg` backend, save figures to files only, and support `--no-plot`.
+
 Useful optional arguments:
 
 ```powershell
@@ -167,4 +256,3 @@ If no ground-truth HR column exists, error metrics are written as `null`, but HR
 
 - KID-PPG: https://github.com/esl-epfl/KID-PPG
 - Tiny-PPG: https://github.com/SZTU-wearable/Tiny-PPG
-

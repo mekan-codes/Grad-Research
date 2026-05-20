@@ -17,7 +17,10 @@ def load_checkpoint(path: str | Path, map_location: str | torch.device = "cpu") 
     checkpoint_path = Path(path)
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
-    payload = torch.load(checkpoint_path, map_location=map_location)
+    try:
+        payload = torch.load(checkpoint_path, map_location=map_location, weights_only=False)
+    except TypeError:
+        payload = torch.load(checkpoint_path, map_location=map_location)
     if not isinstance(payload, dict):
         raise ValueError(f"Checkpoint must contain a dict payload: {checkpoint_path}")
     return payload
@@ -25,4 +28,3 @@ def load_checkpoint(path: str | Path, map_location: str | torch.device = "cpu") 
 
 def best_checkpoint_path(checkpoint_dir: str | Path, filename: str = "best_model.pth") -> Path:
     return Path(checkpoint_dir) / filename
-

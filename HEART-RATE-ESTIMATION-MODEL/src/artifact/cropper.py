@@ -33,6 +33,8 @@ class CropperConfig:
     mode: str = "crop"
     min_clean_samples: int = 1
     mask_fill_value: float = 0.0
+    min_output_samples: int = 1
+    empty_policy: str = "empty"
 
 
 class ArtifactCropper:
@@ -95,6 +97,16 @@ def crop_artifact_regions(
         return CroppedSignal(values.copy(), metadata)
 
     if mask.all():
+        if cfg.empty_policy == "keep_original":
+            metadata = CropMetadata(
+                original_length=original_length,
+                cropped_length=original_length,
+                percent_removed=0.0,
+                number_of_removed_segments=1,
+                mode="crop",
+                all_noisy=True,
+            )
+            return CroppedSignal(values.copy(), metadata)
         metadata = CropMetadata(
             original_length=original_length,
             cropped_length=0,
@@ -117,6 +129,15 @@ def crop_artifact_regions(
         cropped = np.concatenate([values[start:stop] for start, stop in kept]).astype(np.float32, copy=False)
     else:
         cropped = np.empty(0, dtype=np.float32)
+    min_output = max(0, int(cfg.min_output_samples))
+    if cropped.size < min_output and cfg.empty_policy in {"keep_original", "keep_longest"}:
+        fallback = values.copy()
+        if cfg.empty_policy == "keep_longest" and clean_segments:
+            start, stop = max(clean_segments, key=lambda item: item[1] - item[0])
+            fallback = values[start:stop].copy()
+        if fallback.size > cropped.size:
+            cropped = fallback.astype(np.float32, copy=False)
+            kept_short = True
 
     metadata = CropMetadata(
         original_length=original_length,

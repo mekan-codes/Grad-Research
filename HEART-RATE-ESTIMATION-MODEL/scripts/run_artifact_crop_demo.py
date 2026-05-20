@@ -4,7 +4,6 @@ import argparse
 from pathlib import Path
 import sys
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
@@ -27,6 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", default="configs/debug_cpu.yaml", help="Config with TinyPPG paths.")
     parser.add_argument("--output-dir", default="data/output", help="Directory for plot output.")
     parser.add_argument("--fs", type=float, default=64.0, help="Fallback sampling rate.")
+    parser.add_argument("--no-plot", action="store_true", help="Run detection/cropping but skip matplotlib plot generation.")
     return parser.parse_args()
 
 
@@ -48,6 +48,7 @@ def main() -> int:
     detector = TinyPPGArtifactDetector(
         loaded.model,
         threshold=float(tiny_cfg.get("threshold", 0.5)),
+        artifact_output_mode=str(tiny_cfg.get("artifact_output_mode", "artifact_probability")),
         artifact_class_index=int(tiny_cfg.get("artifact_class_index", 1)),
     )
     tensor = torch.tensor(clean_input, dtype=torch.float32).unsqueeze(0)
@@ -58,6 +59,8 @@ def main() -> int:
         CropperConfig(
             mode=str(crop_cfg.get("mode", "crop")),
             min_clean_samples=int(crop_cfg.get("min_clean_samples", 1)),
+            min_output_samples=int(crop_cfg.get("min_output_samples", 1)),
+            empty_policy=str(crop_cfg.get("empty_policy", "empty")),
             mask_fill_value=float(crop_cfg.get("mask_fill_value", 0.0)),
         )
     )
@@ -67,8 +70,11 @@ def main() -> int:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "artifact_crop_demo.png"
-    _plot_demo(clean_input, mask, cropped.signal, fs, source, output_path)
-    print(f"Saved plot: {output_path}")
+    if not args.no_plot:
+        _plot_demo(clean_input, mask, cropped.signal, fs, source, output_path)
+        print(f"Saved plot: {output_path}")
+    else:
+        print("Plot skipped because --no-plot was set.")
     meta = cropped.metadata
     print(
         f"Cropped {meta.percent_removed:.2f}% "
@@ -105,6 +111,11 @@ def _plot_demo(
     source: str,
     output_path: Path,
 ) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg", force=True)
+    import matplotlib.pyplot as plt
+
     time = np.arange(raw.size) / fs
     cropped_time = np.arange(cropped.size) / fs
     fig, axes = plt.subplots(2, 1, figsize=(12, 6), constrained_layout=True)
@@ -138,4 +149,3 @@ def _mask_segments(mask: np.ndarray) -> list[tuple[int, int]]:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

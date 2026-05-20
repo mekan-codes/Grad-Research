@@ -32,12 +32,14 @@ class TinyPPGArtifactDetector(nn.Module):
         self,
         tinyppg: nn.Module,
         threshold: float = 0.5,
+        artifact_output_mode: str = "artifact_probability",
         artifact_class_index: int = 1,
         normalize_input: bool = True,
     ) -> None:
         super().__init__()
         self.tinyppg = freeze_module(tinyppg)
         self.threshold = float(threshold)
+        self.artifact_output_mode = str(artifact_output_mode)
         self.artifact_class_index = int(artifact_class_index)
         self.normalize_input = bool(normalize_input)
 
@@ -57,6 +59,7 @@ class TinyPPGArtifactDetector(nn.Module):
             probability = adapt_tinyppg_output(
                 output,
                 target_length=x.shape[-1],
+                artifact_output_mode=self.artifact_output_mode,
                 artifact_class_index=self.artifact_class_index,
             )
 
@@ -70,7 +73,8 @@ class TinyPPGArtifactDetector(nn.Module):
             metadata={
                 "threshold": self.threshold,
                 "mask_true_means": "artifact/noisy",
-                "adapter": "TinyPPG output dict['seg'] or tensor probability",
+                "artifact_output_mode": self.artifact_output_mode,
+                "adapter": "TinyPPG segmentation tensor adapted according to config",
             },
         )
 
@@ -86,35 +90,25 @@ class TinyPPGArtifactDetector(nn.Module):
 def adapt_tinyppg_output(
     output: Any,
     target_length: int,
+    artifact_output_mode: str = "artifact_probability",
     artifact_class_index: int = 1,
 ) -> torch.Tensor:
     """Convert TinyPPG output to ``[batch, time]`` artifact probabilities.
 
-    The local TinyPPG model returns ``{"seg": sigmoid_prob}``. If a future
-    checkpoint returns two channels, we use ``artifact_class_index`` after
-    softmax. TODO: confirm class index semantics for any non-local checkpoint.
+    The caller must choose the output interpretation with
+    ``artifact_output_mode``:
+
+    - ``artifact_probability``: tensor is already P(artifact).
+    - ``clean_probability``: tensor is P(clean), so it is inverted.
+    - ``logits``: one-channel logits use sigmoid; two-channel logits use softmax.
+    - ``class_index``: select ``artifact_class_index`` from a class dimension.
+
+    TODO: confirm TinyPPG class/output semantics for any checkpoint other than
+    the local ``output["seg"]`` checkpoint before trusting real training metrics.
     """
 
     tensor = _extract_segmentation_tensor(output)
-    if tensor.ndim == 1:
-        tensor = tensor.unsqueeze(0)
-    elif tensor.ndim == 3:
-        if tensor.shape[1] == 1:
-            tensor = tensor[:, 0, :]
-        elif tensor.shape[1] == 2:
-            probs = torch.softmax(tensor, dim=1)
-            class_index = max(0, min(int(artifact_class_index), tensor.shape[1] - 1))
-            tensor = probs[:, class_index, :]
-        elif tensor.shape[-1] == 1:
-            tensor = tensor[..., 0]
-        elif tensor.shape[-1] == 2:
-            probs = torch.softmax(tensor, dim=-1)
-            class_index = max(0, min(int(artifact_class_index), tensor.shape[-1] - 1))
-            tensor = probs[..., class_index]
-        else:
-            raise TinyPPGOutputError(f"Unsupported TinyPPG tensor shape: {tuple(tensor.shape)}")
-    elif tensor.ndim != 2:
-        raise TinyPPGOutputError(f"Unsupported TinyPPG tensor shape: {tuple(tensor.shape)}")
+    tensor, already_probability = _normalize_shape(tensor, artifact_output_mode, artifact_class_index)
 
     if tensor.shape[-1] != target_length:
         tensor = F.interpolate(
@@ -124,10 +118,73 @@ def adapt_tinyppg_output(
             align_corners=False,
         ).squeeze(1)
 
-    finite = tensor.detach()[torch.isfinite(tensor.detach())]
-    if finite.numel() and (finite.min() < 0.0 or finite.max() > 1.0):
-        tensor = torch.sigmoid(tensor)
-    return torch.nan_to_num(tensor, nan=0.0, posinf=1.0, neginf=0.0).clamp(0.0, 1.0)
+    probability = _apply_output_mode(tensor, artifact_output_mode, already_probability=already_probability)
+    return torch.nan_to_num(probability, nan=0.0, posinf=1.0, neginf=0.0).clamp(0.0, 1.0)
+
+
+def _normalize_shape(tensor: torch.Tensor, mode: str, artifact_class_index: int) -> tuple[torch.Tensor, bool]:
+    if tensor.ndim == 1:
+        return tensor.unsqueeze(0), False
+    if tensor.ndim == 2:
+        return tensor, False
+    if tensor.ndim == 3:
+        if tensor.shape[1] == 1:
+            return tensor[:, 0, :], False
+        if tensor.shape[1] >= 2:
+            if mode not in {"logits", "class_index"}:
+                raise TinyPPGOutputError(
+                    "TinyPPG returned multiple channel outputs. Set "
+                    "artifact_output_mode to 'logits' or 'class_index'."
+            )
+            class_index = max(0, min(int(artifact_class_index), tensor.shape[1] - 1))
+            if mode == "logits":
+                return torch.softmax(tensor, dim=1)[:, class_index, :], True
+            return tensor[:, class_index, :], False
+        if tensor.shape[-1] == 1:
+            return tensor[..., 0], False
+        if tensor.shape[-1] >= 2:
+            if mode not in {"logits", "class_index"}:
+                raise TinyPPGOutputError(
+                    "TinyPPG returned multiple class outputs. Set "
+                    "artifact_output_mode to 'logits' or 'class_index'."
+            )
+            class_index = max(0, min(int(artifact_class_index), tensor.shape[-1] - 1))
+            if mode == "logits":
+                return torch.softmax(tensor, dim=-1)[..., class_index], True
+            return tensor[..., class_index], False
+    raise TinyPPGOutputError(f"Unsupported TinyPPG tensor shape: {tuple(tensor.shape)}")
+
+
+def _apply_output_mode(tensor: torch.Tensor, mode: str, already_probability: bool = False) -> torch.Tensor:
+    mode = str(mode)
+    if mode == "artifact_probability":
+        _raise_if_not_probability(tensor, mode)
+        return tensor
+    if mode == "clean_probability":
+        _raise_if_not_probability(tensor, mode)
+        return 1.0 - tensor
+    if mode == "logits":
+        if already_probability:
+            return tensor
+        return torch.sigmoid(tensor)
+    if mode == "class_index":
+        _raise_if_not_probability(tensor, mode)
+        return tensor
+    raise TinyPPGOutputError(
+        "artifact_output_mode must be one of: artifact_probability, "
+        "clean_probability, logits, class_index"
+    )
+
+
+def _raise_if_not_probability(tensor: torch.Tensor, mode: str) -> None:
+    detached = tensor.detach()
+    finite = detached[torch.isfinite(detached)]
+    if finite.numel() and (finite.min() < -1e-4 or finite.max() > 1.0001):
+        raise TinyPPGOutputError(
+            f"artifact_output_mode={mode!r} expects probabilities in [0, 1], "
+            f"but saw min={float(finite.min()):.4f}, max={float(finite.max()):.4f}. "
+            "Try artifact_output_mode='logits' if this checkpoint emits logits."
+        )
 
 
 def _extract_segmentation_tensor(output: Any) -> torch.Tensor:
@@ -150,6 +207,12 @@ def _extract_segmentation_tensor(output: Any) -> torch.Tensor:
         if tensors:
             return tensors[0]
     raise TinyPPGOutputError(f"Cannot adapt TinyPPG output type: {type(output)!r}")
+
+
+def extract_segmentation_tensor(output: Any) -> torch.Tensor:
+    """Public diagnostic helper for inspecting raw TinyPPG segmentation output."""
+
+    return _extract_segmentation_tensor(output)
 
 
 def _as_batch_time(ppg: torch.Tensor) -> torch.Tensor:

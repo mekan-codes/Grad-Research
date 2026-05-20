@@ -1,13 +1,16 @@
 .venv/
+.env
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+*.log
 
 data/input/*
 !data/input/.gitkeep
 data/raw/
+data/prepared/
 data/interim/
 data/processed/
 *.zip
@@ -19,10 +22,14 @@ data/output/*
 
 checkpoints/*
 !checkpoints/README.md
+*.pth
+*.pt
+*.ckpt
 checkpoints/**/*.pth
 checkpoints/**/*.pt
 checkpoints/**/*.ckpt
 checkpoints/**/*.pkl
+runs/
 
 experiments/*
 !experiments/.gitkeep

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 import pickle
+import shutil
 import sys
+from typing import Iterable
 
 import numpy as np
 import pandas as pd
@@ -14,44 +17,123 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
+DEFAULT_TRAIN_SUBJECTS = [f"S{i}" for i in range(1, 11)]
+DEFAULT_VAL_SUBJECTS = [f"S{i}" for i in range(11, 14)]
+DEFAULT_TEST_SUBJECTS = [f"S{i}" for i in range(14, 16)]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Prepare local PPG-DaLiA .pkl files into time,ppg,hr CSV files.",
+        description="Prepare local PPG-DaLiA .pkl files into subject-split CSV files.",
     )
-    parser.add_argument("--input-root", default="data/raw/PPG-DaLiA", help="Root containing S*/S*.pkl files.")
-    parser.add_argument("--output-dir", default="data/input/prepared", help="Output CSV directory.")
-    parser.add_argument("--subject", default=None, help="Optional subject id such as S1.")
+    parser.add_argument("--data-root", "--input-root", default="data/raw/PPG_Dalia", help="Root containing S*/S*.pkl files.")
+    parser.add_argument("--output-dir", default="data/prepared/ppg_dalia", help="Prepared output directory.")
+    parser.add_argument("--train-subjects", default=",".join(DEFAULT_TRAIN_SUBJECTS), help="Comma-separated train subjects.")
+    parser.add_argument("--val-subjects", default=",".join(DEFAULT_VAL_SUBJECTS), help="Comma-separated val subjects.")
+    parser.add_argument("--test-subjects", default=",".join(DEFAULT_TEST_SUBJECTS), help="Comma-separated test subjects.")
+    parser.add_argument("--force", action="store_true", help="Overwrite existing prepared files.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    input_root = Path(args.input_root)
-    output_dir = Path(args.output_dir)
-    files = discover_subject_pickles(input_root, args.subject)
-    if not files:
-        print(f"No PPG-DaLiA pickle files found under {input_root}.")
-        print("Expected local structure: data/raw/PPG-DaLiA/S1/S1.pkl, S2/S2.pkl, ...")
-        print("This script does not download the dataset automatically.")
+    splits = {
+        "train": parse_subject_list(args.train_subjects),
+        "val": parse_subject_list(args.val_subjects),
+        "test": parse_subject_list(args.test_subjects),
+    }
+    try:
+        metadata = prepare_ppg_dalia_dataset(
+            data_root=Path(args.data_root),
+            output_dir=Path(args.output_dir),
+            splits=splits,
+            force=bool(args.force),
+        )
+    except FileNotFoundError as exc:
+        print(str(exc))
+        print("This script does not download PPG-DaLiA automatically. Place the dataset locally first.")
         return 1
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    for pkl_path in files:
-        frame = prepare_one_pickle(pkl_path)
-        output_path = output_dir / f"{pkl_path.stem.upper()}.csv"
-        frame.to_csv(output_path, index=False)
-        print(f"Wrote {output_path}")
+    print(f"Prepared {metadata['total_subjects']} subject file(s) under {args.output_dir}")
     return 0
 
 
-def discover_subject_pickles(input_root: Path, subject: str | None) -> list[Path]:
-    if not input_root.exists():
-        return []
-    if subject:
-        subject_id = subject.upper().removesuffix(".PKL")
-        candidate = input_root / subject_id / f"{subject_id}.pkl"
-        return [candidate] if candidate.exists() else []
-    return sorted(input_root.glob("S*/S*.pkl"), key=lambda path: _subject_sort_key(path.stem))
+def prepare_ppg_dalia_dataset(
+    data_root: Path,
+    output_dir: Path,
+    splits: dict[str, list[str]] | None = None,
+    force: bool = False,
+) -> dict:
+    splits = splits or {
+        "train": DEFAULT_TRAIN_SUBJECTS,
+        "val": DEFAULT_VAL_SUBJECTS,
+        "test": DEFAULT_TEST_SUBJECTS,
+    }
+    if not data_root.exists():
+        raise FileNotFoundError(f"PPG-DaLiA data root does not exist: {data_root}")
+
+    if force and output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    metadata = {
+        "data_root": str(data_root),
+        "output_dir": str(output_dir),
+        "splits": splits,
+        "subjects": {},
+        "total_subjects": 0,
+    }
+    missing: list[str] = []
+    for split_name, subjects in splits.items():
+        split_dir = output_dir / split_name
+        split_dir.mkdir(parents=True, exist_ok=True)
+        for subject in subjects:
+            pkl_path = find_subject_pickle(data_root, subject)
+            if pkl_path is None:
+                missing.append(subject)
+                continue
+            output_path = split_dir / f"{subject.upper()}.csv"
+            if not output_path.exists() or force:
+                frame = prepare_one_pickle(pkl_path)
+                frame.to_csv(output_path, index=False)
+            metadata["subjects"][subject.upper()] = {
+                "split": split_name,
+                "source": str(pkl_path),
+                "prepared_csv": str(output_path),
+            }
+            metadata["total_subjects"] += 1
+
+    metadata["missing_subjects"] = missing
+    metadata_path = output_dir / "metadata.json"
+    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    if metadata["total_subjects"] == 0:
+        raise FileNotFoundError(
+            f"No PPG-DaLiA pickle files found under {data_root}. Expected paths like S1/S1.pkl."
+        )
+    if missing:
+        print(f"Warning: missing subject(s): {', '.join(missing)}")
+    return metadata
+
+
+def find_subject_pickle(data_root: Path, subject: str) -> Path | None:
+    subject_id = subject.upper().removesuffix(".PKL")
+    candidates = [
+        data_root / subject_id / f"{subject_id}.pkl",
+        data_root / f"{subject_id}.pkl",
+        data_root / subject_id.lower() / f"{subject_id}.pkl",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    matches = list(data_root.glob(f"**/{subject_id}.pkl"))
+    return matches[0] if matches else None
+
+
+def parse_subject_list(value: str | Iterable[str]) -> list[str]:
+    if isinstance(value, str):
+        parts = value.split(",")
+    else:
+        parts = list(value)
+    return [str(part).strip().upper() for part in parts if str(part).strip()]
 
 
 def prepare_one_pickle(path: Path) -> pd.DataFrame:
@@ -88,14 +170,6 @@ def prepare_one_pickle(path: Path) -> pd.DataFrame:
             for idx, name in enumerate(("acc_x", "acc_y", "acc_z")):
                 frame[name] = np.interp(time, acc_time, acc_values[:, idx], left=np.nan, right=np.nan)
     return frame
-
-
-def _subject_sort_key(subject: str) -> tuple[int, str]:
-    text = subject.upper()
-    try:
-        return int(text.lstrip("S")), text
-    except ValueError:
-        return 9999, text
 
 
 if __name__ == "__main__":

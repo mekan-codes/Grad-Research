@@ -116,6 +116,7 @@ def build_full_framework(config: dict[str, Any], device: str | torch.device = "c
     detector = TinyPPGArtifactDetector(
         loaded.model,
         threshold=float(tiny_cfg.get("threshold", 0.5)),
+        artifact_output_mode=str(tiny_cfg.get("artifact_output_mode", "artifact_probability")),
         artifact_class_index=int(tiny_cfg.get("artifact_class_index", 1)),
     )
     crop_cfg = config.get("cropper", {})
@@ -124,6 +125,8 @@ def build_full_framework(config: dict[str, Any], device: str | torch.device = "c
             mode=str(crop_cfg.get("mode", "crop")),
             min_clean_samples=int(crop_cfg.get("min_clean_samples", 1)),
             mask_fill_value=float(crop_cfg.get("mask_fill_value", 0.0)),
+            min_output_samples=int(crop_cfg.get("min_output_samples", 1)),
+            empty_policy=str(crop_cfg.get("empty_policy", "empty")),
         )
     )
     hr_model = build_hr_model(config.get("model", {})).to(device)
