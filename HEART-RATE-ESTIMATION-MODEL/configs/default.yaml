@@ -1,0 +1,55 @@
+project:
+  name: tinyppg_hr_pipeline
+  output_dir: data/output
+
+device: cpu
+seed: 42
+
+data:
+  dataset: ppg_dalia
+  data_dir: data/input/prepared
+  sampling_rate_hz: 64
+  window_sec: 30
+  step_sec: 15
+  max_windows: null
+  val_fraction: 0.2
+  num_workers: 0
+
+preprocessing:
+  normalize: zscore
+  detrend: true
+  bandpass:
+    enabled: true
+    low_hz: 0.5
+    high_hz: 5.0
+    order: 3
+
+tinyppg:
+  model_dir: ../Tiny-PPG-master
+  checkpoint_path: ../Tiny-PPG-master/Save_Model/model_parameter-2023-5-31-1.pkl
+  threshold: 0.5
+  artifact_class_index: 1
+  require_checkpoint: true
+
+cropper:
+  mode: crop
+  min_clean_samples: 8
+  mask_fill_value: 0.0
+
+model:
+  name: hr_estimator
+  hidden_channels: 64
+  dropout: 0.1
+
+training:
+  epochs: 20
+  batch_size: 16
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  loss: huber
+  huber_delta: 5.0
+  max_train_batches: null
+  max_val_batches: null
+  checkpoint_dir: checkpoints/hr_estimator
+  hr_checkpoint_dir: checkpoints/hr_estimator
+  framework_checkpoint_dir: checkpoints/full_framework

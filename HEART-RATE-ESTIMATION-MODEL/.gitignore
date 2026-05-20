@@ -7,12 +7,22 @@ __pycache__/
 
 data/input/*
 !data/input/.gitkeep
+data/raw/
+data/interim/
+data/processed/
+*.zip
+*.tar
+*.tar.gz
+*.7z
 data/output/*
 !data/output/.gitkeep
 
 checkpoints/*
 !checkpoints/README.md
+checkpoints/**/*.pth
+checkpoints/**/*.pt
+checkpoints/**/*.ckpt
+checkpoints/**/*.pkl
 
 experiments/*
 !experiments/.gitkeep
-

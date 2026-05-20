@@ -1,0 +1,22 @@
+inherits: configs/default.yaml
+
+data:
+  dataset: ppg_dalia
+  data_dir: data/input/prepared
+  sampling_rate_hz: 64
+  window_sec: 30
+  step_sec: 15
+  val_fraction: 0.2
+
+training:
+  epochs: 40
+  batch_size: 32
+  learning_rate: 0.0005
+  weight_decay: 0.0001
+  hr_checkpoint_dir: checkpoints/hr_estimator
+  framework_checkpoint_dir: checkpoints/full_framework
+
+model:
+  name: robust_hr_estimator
+  hidden_channels: 64
+  dropout: 0.15

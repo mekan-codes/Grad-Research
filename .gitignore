@@ -170,6 +170,17 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
+# Grad research generated data and checkpoints
+HEART-RATE-ESTIMATION-MODEL/data/raw/
+HEART-RATE-ESTIMATION-MODEL/data/interim/
+HEART-RATE-ESTIMATION-MODEL/data/processed/
+HEART-RATE-ESTIMATION-MODEL/data/input/*.zip
+HEART-RATE-ESTIMATION-MODEL/data/input/prepared/*.csv
+HEART-RATE-ESTIMATION-MODEL/data/output/
+HEART-RATE-ESTIMATION-MODEL/checkpoints/**/*.pth
+HEART-RATE-ESTIMATION-MODEL/checkpoints/**/*.pt
+HEART-RATE-ESTIMATION-MODEL/checkpoints/**/*.ckpt
+
 # PyPI configuration file
 .pypirc
 

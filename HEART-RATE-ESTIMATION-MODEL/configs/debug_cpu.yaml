@@ -1,0 +1,29 @@
+inherits: configs/default.yaml
+
+device: cpu
+seed: 7
+
+data:
+  dataset: synthetic
+  sampling_rate_hz: 64
+  window_sec: 30
+  step_sec: 30
+  synthetic_samples: 24
+  val_fraction: 0.25
+  num_workers: 0
+
+training:
+  epochs: 1
+  batch_size: 4
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  max_train_batches: 2
+  max_val_batches: 1
+  checkpoint_dir: checkpoints/hr_estimator
+
+tinyppg:
+  model_dir: ../Tiny-PPG-master
+  checkpoint_path: ../Tiny-PPG-master/Save_Model/model_parameter-2023-5-31-1.pkl
+  threshold: 0.5
+  require_checkpoint: true
+
