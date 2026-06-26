@@ -15,6 +15,7 @@ from src.data.windowing import median_label_for_range, sliding_window_ranges
 
 @dataclass
 class SubjectRecord:
+    subject_id: str
     path: Path
     ppg: np.ndarray
     hr: np.ndarray
@@ -68,6 +69,7 @@ class PPGDaLiAWindowDataset(Dataset):
                 continue
             subject_index = len(self.subjects)
             record = SubjectRecord(
+                subject_id=path.stem.upper(),
                 path=path,
                 ppg=loaded.ppg.astype(float, copy=False),
                 hr=loaded.ground_truth_hr.astype(float, copy=False),
@@ -115,6 +117,7 @@ class PPGDaLiAWindowDataset(Dataset):
             "ppg": torch.from_numpy(ppg),
             "hr_label": float(item.hr_label),
             "metadata": {
+                "subject": subject.subject_id,
                 "source": str(subject.path),
                 "start": item.start,
                 "stop": item.stop,
@@ -185,4 +188,3 @@ def _subject_sort_key(subject: str) -> tuple[int, str]:
         return int(text.lstrip("S")), text
     except ValueError:
         return 9999, text
-

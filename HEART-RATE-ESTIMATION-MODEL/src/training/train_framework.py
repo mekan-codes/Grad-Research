@@ -68,7 +68,8 @@ def train_full_framework(config: dict[str, Any], resume: str | bool | None = Non
         start_epoch = int(payload.get("epoch", 0)) + 1
         _log(logger, f"Resumed full framework from {resume_path} at epoch {start_epoch}")
 
-    for epoch in range(start_epoch, int(training_cfg.get("max_epochs", training_cfg.get("epochs", 1))) + 1):
+    epochs = int(training_cfg.get("max_epochs", training_cfg.get("epochs", 1)))
+    for epoch in range(start_epoch, epochs + 1):
         train_metrics = _run_framework_epoch(
             framework,
             loaders["train"],
@@ -93,7 +94,7 @@ def train_full_framework(config: dict[str, Any], resume: str | bool | None = Non
         history.append(row)
         _log(
             logger,
-            f"epoch {epoch:03d} | train loss {train_metrics['loss']:.4f} "
+            f"[tinyppg_cropped] epoch {epoch:03d}/{epochs:03d} | train loss {train_metrics['loss']:.4f} "
             f"mae {train_metrics['mae']:.2f} | val mae {val_metrics['mae']:.2f}",
         )
         last_payload = {

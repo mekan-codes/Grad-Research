@@ -22,7 +22,7 @@ from src.models.full_framework import build_full_framework, build_hr_model
 from src.training.evaluate import evaluate_checkpoint
 from src.training.train_framework import train_full_framework
 from src.training.train_hr import build_train_val_datasets, train_hr_estimator
-from src.utils.config import apply_cli_overrides, load_config, save_config
+from src.utils.config import apply_cli_overrides, load_config, normalize_config_paths, save_config
 from src.utils.environment import collect_environment_info, resolve_device, validate_training_environment
 from src.utils.logging import configure_run_logger
 from src.utils.seed import set_seed
@@ -45,11 +45,13 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    config = apply_cli_overrides(
-        load_config(args.config),
-        data_root=args.data_root,
-        output_dir=args.output_dir,
-        resume=args.resume,
+    config = normalize_config_paths(
+        apply_cli_overrides(
+            load_config(args.config),
+            data_root=args.data_root,
+            output_dir=args.output_dir,
+            resume=args.resume,
+        )
     )
     if args.smoke_only:
         config = _force_smoke_overrides(config)
@@ -169,14 +171,27 @@ def _make_run_dirs(output_dir: Path) -> dict[str, Path]:
 
 def _prepare_if_needed(config: dict[str, Any], logger: Any) -> None:
     data_cfg = config.get("data", {})
-    prepared_dir = Path(data_cfg.get("prepared_dir", "data/prepared/ppg_dalia"))
-    already_prepared = any(any((prepared_dir / split).glob("*.csv")) for split in ("train", "val", "test"))
-    if already_prepared:
+    prepared_dir = _configured_prepared_dir(data_cfg)
+    if _has_prepared_csvs(prepared_dir):
         logger.info("Prepared data already exists at %s", prepared_dir)
         return
-    logger.info("Preparing PPG-DaLiA from %s", data_cfg.get("data_root"))
+
+    data_dir = data_cfg.get("data_dir")
+    if data_dir is not None and _has_prepared_csvs(Path(data_dir)):
+        logger.info("Using prepared CSV data at %s", data_dir)
+        data_cfg["prepared_dir"] = str(data_dir)
+        return
+
+    raw_root = Path(data_cfg.get("data_root", "data/raw/PPG_Dalia"))
+    if not raw_root.exists():
+        raise FileNotFoundError(
+            "No prepared CSV data was found and the raw PPG-DaLiA root does not exist. "
+            f"Checked prepared data at {prepared_dir} and raw data at {raw_root}."
+        )
+
+    logger.info("Preparing PPG-DaLiA from %s", raw_root)
     prepare_ppg_dalia_dataset(
-        data_root=Path(data_cfg.get("data_root", "data/raw/PPG_Dalia")),
+        data_root=raw_root,
         output_dir=prepared_dir,
         splits={
             "train": list(data_cfg.get("train_subjects", [])),
@@ -185,6 +200,18 @@ def _prepare_if_needed(config: dict[str, Any], logger: Any) -> None:
         },
         force=False,
     )
+
+
+def _configured_prepared_dir(data_cfg: dict[str, Any]) -> Path:
+    return Path(data_cfg.get("prepared_dir") or data_cfg.get("data_dir") or "data/prepared/ppg_dalia")
+
+
+def _has_prepared_csvs(path: Path) -> bool:
+    if not path.exists():
+        return False
+    if any(path.glob("*.csv")):
+        return True
+    return any(any((path / split).glob("*.csv")) for split in ("train", "val", "test"))
 
 
 def _dataset_summary(config: dict[str, Any], logger: Any) -> dict[str, Any]:

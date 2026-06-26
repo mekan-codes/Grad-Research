@@ -80,13 +80,26 @@ def validate_training_environment(
     if require_tinyppg and not info["tinyppg_checkpoint_exists"]:
         errors.append(f"TinyPPG checkpoint not found: {tiny_cfg.get('checkpoint_path')}")
 
-    raw_root = data_root if data_root is not None else config.get("data", {}).get("data_root")
+    data_cfg = config.get("data", {})
+    raw_root = data_root if data_root is not None else data_cfg.get("data_root")
     root = Path(str(raw_root)) if raw_root not in {None, ""} else None
     info["dataset_root"] = str(root) if root is not None else None
     info["dataset_root_exists"] = root.exists() if root is not None else False
+    prepared_root = _resolve_path(data_cfg.get("prepared_dir") or data_cfg.get("data_dir"))
+    prepared_csvs_exist = _has_prepared_csvs(prepared_root)
+    info["prepared_data_root"] = str(prepared_root) if prepared_root is not None else None
+    info["prepared_data_exists"] = bool(prepared_root and prepared_root.exists())
+    info["prepared_csvs_exist"] = prepared_csvs_exist
     dataset = str(config.get("data", {}).get("dataset", "")).lower()
-    if require_dataset and dataset != "synthetic" and (root is None or not root.exists()):
-        errors.append(f"Dataset root does not exist: {root}")
+    if require_dataset and dataset != "synthetic":
+        raw_exists = bool(root and root.exists())
+        if not raw_exists and not prepared_csvs_exist:
+            errors.append(
+                "Dataset data was not found. "
+                f"Raw root: {root}; prepared CSV root: {prepared_root}"
+            )
+        elif not raw_exists and prepared_csvs_exist:
+            warnings.append(f"Raw dataset root is unavailable; using prepared CSVs at {prepared_root}.")
 
     out = Path(output_dir or config.get("paths", {}).get("output_dir") or config.get("project", {}).get("output_dir") or "runs/default")
     info["output_dir"] = str(out)
@@ -143,6 +156,14 @@ def _resolve_path(value: Any) -> Path | None:
         if candidate.exists():
             return candidate
     return project_root / raw
+
+
+def _has_prepared_csvs(path: Path | None) -> bool:
+    if path is None or not path.exists():
+        return False
+    if any(path.glob("*.csv")):
+        return True
+    return any(any((path / split).glob("*.csv")) for split in ("train", "val", "test"))
 
 
 def _check_writable(path: Path) -> bool:

@@ -5,6 +5,10 @@ from pathlib import Path
 from typing import Any
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = PROJECT_ROOT.parent
+
+
 def load_config(path: str | Path) -> dict[str, Any]:
     """Load a YAML config with optional ``inherits`` support.
 
@@ -13,7 +17,7 @@ def load_config(path: str | Path) -> dict[str, Any]:
     environments.
     """
 
-    config_path = Path(path)
+    config_path = resolve_project_path(path, prefer_existing=True)
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
@@ -28,6 +32,57 @@ def load_config(path: str | Path) -> dict[str, Any]:
         base = load_config(parent_path)
         return deep_update(base, config)
     return config
+
+
+def resolve_project_path(
+    path: str | Path,
+    *,
+    base_dir: str | Path | None = None,
+    prefer_existing: bool = False,
+) -> Path:
+    """Resolve relative project paths consistently from scripts or the repo root."""
+
+    raw = Path(path)
+    if raw.is_absolute():
+        return raw
+
+    base = Path(base_dir) if base_dir is not None else PROJECT_ROOT
+    candidates = [Path.cwd() / raw, base / raw, PROJECT_ROOT / raw, REPO_ROOT / raw]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    if prefer_existing:
+        return base / raw
+    return base / raw
+
+
+def normalize_config_paths(config: dict[str, Any], base_dir: str | Path | None = None) -> dict[str, Any]:
+    """Return a copy with file-system path fields made absolute.
+
+    Config files in this repo are written with project-relative paths. This
+    keeps them usable when a script is launched from a parent folder or IDE.
+    """
+
+    updated = deepcopy(config)
+    base = Path(base_dir) if base_dir is not None else PROJECT_ROOT
+    _normalize_mapping_paths(updated.setdefault("data", {}), ("data_root", "prepared_dir", "data_dir"), base)
+    _normalize_mapping_paths(updated.setdefault("tinyppg", {}), ("model_dir", "checkpoint_path"), base)
+    _normalize_mapping_paths(updated.setdefault("project", {}), ("output_dir",), base)
+    _normalize_mapping_paths(updated.setdefault("paths", {}), ("output_dir", "checkpoint_dir", "log_dir"), base)
+    _normalize_mapping_paths(
+        updated.setdefault("training", {}),
+        ("checkpoint_dir", "hr_checkpoint_dir", "framework_checkpoint_dir"),
+        base,
+    )
+    return updated
+
+
+def _normalize_mapping_paths(mapping: dict[str, Any], keys: tuple[str, ...], base_dir: Path) -> None:
+    for key in keys:
+        value = mapping.get(key)
+        if value is None or value == "":
+            continue
+        mapping[key] = str(resolve_project_path(value, base_dir=base_dir))
 
 
 def deep_update(base: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:

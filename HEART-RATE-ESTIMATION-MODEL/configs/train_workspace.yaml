@@ -10,7 +10,7 @@ resume: null
 data:
   dataset: PPG_DaLiA
   data_root: data/raw/PPG_Dalia
-  prepared_dir: data/prepared/ppg_dalia
+  prepared_dir: data/input/prepared
   sampling_rate_hz: 64
   window_seconds_options: [30, 25, 20]
   window_sec: 30
@@ -81,4 +81,3 @@ paths:
   output_dir: runs/ppg_dalia_full_run
   checkpoint_dir: runs/ppg_dalia_full_run/checkpoints
   log_dir: runs/ppg_dalia_full_run/logs
-

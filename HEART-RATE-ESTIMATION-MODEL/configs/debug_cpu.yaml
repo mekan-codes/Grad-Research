@@ -1,29 +1,50 @@
 inherits: configs/default.yaml
 
 device: cpu
+use_amp: false
 seed: 7
 
+project:
+  output_dir: runs/debug_cpu
+
 data:
-  dataset: synthetic
+  dataset: PPG_DaLiA
+  prepared_dir: data/input/prepared
   sampling_rate_hz: 64
   window_sec: 30
   step_sec: 30
-  synthetic_samples: 24
-  val_fraction: 0.25
+  train_subjects: [S1]
+  val_subjects: [S2]
+  test_subjects: [S3]
+  max_windows: 64
   num_workers: 0
+
+preprocessing:
+  normalize: minmax
+  detrend: true
+  bandpass:
+    enabled: true
+    low_hz: 0.9
+    high_hz: 5.0
+    order: 3
 
 training:
   epochs: 1
+  max_epochs: 1
   batch_size: 4
+  num_workers: 0
+  use_amp: false
   learning_rate: 0.001
   weight_decay: 0.0001
-  max_train_batches: 2
-  max_val_batches: 1
+  max_train_batches: 4
+  max_val_batches: 2
   checkpoint_dir: checkpoints/hr_estimator
+
+paths:
+  output_dir: runs/debug_cpu
 
 tinyppg:
   model_dir: ../Tiny-PPG-master
   checkpoint_path: ../Tiny-PPG-master/Save_Model/model_parameter-2023-5-31-1.pkl
   threshold: 0.5
   require_checkpoint: true
-

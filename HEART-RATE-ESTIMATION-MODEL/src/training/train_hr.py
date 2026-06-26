@@ -86,7 +86,7 @@ def train_hr_estimator(config: dict[str, Any], resume: str | bool | None = None,
         history.append(row)
         _log(
             logger,
-            f"epoch {epoch:03d} | train loss {train_metrics['loss']:.4f} "
+            f"[raw_hr] epoch {epoch:03d}/{epochs:03d} | train loss {train_metrics['loss']:.4f} "
             f"mae {train_metrics['mae']:.2f} | val mae {val_metrics['mae']:.2f}",
         )
         last_payload = {
@@ -159,6 +159,39 @@ def build_train_val_datasets(config: dict[str, Any]) -> tuple[Dataset, Dataset]:
                 max_windows=data_cfg.get("max_val_windows"),
             )
             return train_dataset, val_dataset
+        train_subjects = _subject_list(data_cfg.get("train_subjects"))
+        val_subjects = _subject_list(data_cfg.get("val_subjects"))
+        if train_subjects and val_subjects:
+            train_dataset = PPGDaLiAWindowDataset(
+                data_dir=prepared_dir,
+                sampling_rate_hz=fs,
+                window_sec=window_sec,
+                step_sec=data_cfg.get("step_sec"),
+                preprocess=config.get("preprocessing", {}),
+                max_windows=data_cfg.get("max_windows"),
+                subjects=train_subjects,
+            )
+            val_dataset = PPGDaLiAWindowDataset(
+                data_dir=prepared_dir,
+                sampling_rate_hz=fs,
+                window_sec=window_sec,
+                step_sec=data_cfg.get("step_sec"),
+                preprocess=config.get("preprocessing", {}),
+                max_windows=data_cfg.get("max_val_windows"),
+                subjects=val_subjects,
+            )
+            return train_dataset, val_dataset
+        if train_subjects:
+            dataset = PPGDaLiAWindowDataset(
+                data_dir=prepared_dir,
+                sampling_rate_hz=fs,
+                window_sec=window_sec,
+                step_sec=data_cfg.get("step_sec"),
+                preprocess=config.get("preprocessing", {}),
+                max_windows=data_cfg.get("max_windows"),
+                subjects=train_subjects,
+            )
+            return split_dataset(dataset, float(data_cfg.get("val_fraction", 0.2)), seed)
         dataset = PPGDaLiAWindowDataset(
             data_dir=prepared_dir,
             sampling_rate_hz=fs,
@@ -171,6 +204,16 @@ def build_train_val_datasets(config: dict[str, Any]) -> tuple[Dataset, Dataset]:
         raise ValueError(f"Unknown dataset: {dataset_name}")
 
     return split_dataset(dataset, float(data_cfg.get("val_fraction", 0.2)), seed)
+
+
+def _subject_list(value: Any) -> list[str]:
+    if value is None or value == "":
+        return []
+    if isinstance(value, str):
+        parts = value.split(",")
+    else:
+        parts = list(value)
+    return [str(part).strip().upper().removesuffix(".CSV") for part in parts if str(part).strip()]
 
 
 def split_dataset(dataset: Dataset, val_fraction: float, seed: int) -> tuple[Dataset, Dataset]:

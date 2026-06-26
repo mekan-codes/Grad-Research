@@ -1,0 +1,28 @@
+inherits: configs/train_workspace.yaml
+
+project:
+  name: loso_tinyppg_hr_pipeline
+  output_dir: runs/loso
+
+data:
+  dataset: ppg_dalia
+  prepared_dir: data/input/prepared
+  data_dir: data/input/prepared
+  train_subjects: []
+  val_subjects: []
+  test_subjects: []
+  max_test_windows: null
+  max_test_batches: null
+
+training:
+  hr_checkpoint_dir: runs/loso/checkpoints/raw
+  framework_checkpoint_dir: runs/loso/checkpoints/tinyppg_cropped
+
+evaluation:
+  batch_size: 32
+  max_test_batches: null
+
+paths:
+  output_dir: runs/loso
+  checkpoint_dir: runs/loso/checkpoints
+  log_dir: runs/loso/logs
