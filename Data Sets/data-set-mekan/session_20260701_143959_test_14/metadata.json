@@ -1,0 +1,45 @@
+{
+  "session_id": "session_20260701_143959_test_14",
+  "subject_id": "test 14",
+  "activity_label": "rest",
+  "notes": "",
+  "start_time_unix_ms": 1782884399905,
+  "stop_time_unix_ms": 1782884432580,
+  "phone_model": "samsung SM-A245F",
+  "watch_model": "SM-R910",
+  "polar_device_id": "1B115C36",
+  "app_version": "0.1.0",
+  "watch_ppg_target_hz": 25,
+  "watch_imu_target_hz": 25,
+  "watch_ppg_hz": 25,
+  "watch_imu_hz": 25,
+  "polar_ecg_hz": 130,
+  "polar_hr_enabled": true,
+  "polar_rr_enabled": true,
+  "samsung_sensor_sdk_available": true,
+  "polar_sdk_available": true,
+  "watch_started": true,
+  "watch_stopped": true,
+  "polar_started": true,
+  "polar_stopped": true,
+  "prepared_session_file": "prepared_session.csv",
+  "prepared_session_generated": true,
+  "prepared_session_row_count": 600,
+  "prepared_session_note": "prepared_session.csv is derived from raw CSV files using approximate nearest timestamp alignment for quick ML ingestion. Raw CSV files remain authoritative.",
+  "stream_started_flags": {
+    "watch": true,
+    "polar": true
+  },
+  "stream_stopped_flags": {
+    "watch": true,
+    "polar": true
+  },
+  "sample_counts": {
+    "watch_ppg": 600,
+    "watch_imu": 905,
+    "polar_ecg": 1087,
+    "polar_hr": 33,
+    "polar_acc": 560
+  },
+  "errors_warnings": []
+}

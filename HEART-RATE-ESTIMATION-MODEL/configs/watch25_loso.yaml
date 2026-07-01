@@ -1,0 +1,46 @@
+inherits: configs/loso.yaml
+
+project:
+  name: watch25_tinyppg_hr_pipeline
+  output_dir: runs/watch25_loso
+
+data:
+  dataset: ppg_dalia
+  prepared_dir: data/input/collector_prepared
+  data_dir: data/input/collector_prepared
+  sampling_rate_hz: 25
+  window_sec: 30
+  step_sec: 15
+  train_subjects: []
+  val_subjects: []
+  test_subjects: []
+
+preprocessing:
+  normalize: zscore
+  detrend: true
+  bandpass:
+    enabled: true
+    low_hz: 0.5
+    high_hz: 5.0
+    order: 3
+
+cropper:
+  mode: crop
+  min_clean_samples: 50
+  min_output_samples: 125
+  empty_policy: keep_longest
+  mask_fill_value: 0.0
+
+training:
+  batch_size: 16
+  num_workers: 0
+  hr_checkpoint_dir: runs/watch25_loso/checkpoints/raw
+  framework_checkpoint_dir: runs/watch25_loso/checkpoints/tinyppg_cropped
+
+evaluation:
+  batch_size: 16
+
+paths:
+  output_dir: runs/watch25_loso
+  checkpoint_dir: runs/watch25_loso/checkpoints
+  log_dir: runs/watch25_loso/logs

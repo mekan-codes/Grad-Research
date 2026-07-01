@@ -22,7 +22,7 @@ from src.artifact.cropper import CropperConfig, crop_artifact_regions
 from src.artifact.tinyppg_wrapper import load_tinyppg
 from src.data.preprocessing import config_from_mapping, preprocess_ppg_window
 from src.data_loader import load_ppg_csv
-from src.utils.config import apply_cli_overrides, load_config
+from src.utils.config import apply_cli_overrides, load_config, normalize_config_paths
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,7 +41,7 @@ def main() -> int:
     output_dir = Path(args.output_dir)
     if args.run_name:
         output_dir = output_dir / args.run_name
-    config = apply_cli_overrides(load_config(args.config), output_dir=str(output_dir))
+    config = normalize_config_paths(apply_cli_overrides(load_config(args.config), output_dir=str(output_dir)))
     metrics_dir = output_dir / "metrics"
     plots_dir = output_dir / "plots"
     metrics_dir.mkdir(parents=True, exist_ok=True)
@@ -167,4 +167,3 @@ def _segments(mask: np.ndarray) -> list[tuple[int, int]]:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

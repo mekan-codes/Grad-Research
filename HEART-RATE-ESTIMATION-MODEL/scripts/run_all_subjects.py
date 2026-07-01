@@ -19,8 +19,8 @@ from src.tiny_ppg_filter import TINY_PPG_WARNING, apply_tiny_ppg_filter
 from src.utils import write_json
 
 
-INPUT_DIR = Path("data/input/prepared")
-OUTPUT_DIR = Path("data/output")
+INPUT_DIR = PROJECT_ROOT / "data" / "input" / "prepared"
+OUTPUT_DIR = PROJECT_ROOT / "data" / "output"
 FS_HZ = 64.0
 DEFAULT_ARTIFACT_THRESHOLD = 0.9
 
@@ -34,6 +34,18 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=DEFAULT_ARTIFACT_THRESHOLD,
         help="Tiny-PPG artifact probability threshold.",
+    )
+    parser.add_argument(
+        "--artifact-output-mode",
+        default="artifact_probability",
+        choices=("artifact_probability", "clean_probability", "logits", "class_index"),
+        help="How to interpret TinyPPG segmentation output.",
+    )
+    parser.add_argument(
+        "--artifact-class-index",
+        type=int,
+        default=1,
+        help="Class index to use when TinyPPG returns class channels.",
     )
     return parser.parse_args()
 
@@ -53,7 +65,12 @@ def main() -> int:
         output_path = OUTPUT_DIR / f"results_{subject}.json"
 
         print(f"Processing {subject}...")
-        result, notes = run_subject(subject_file, args.artifact_threshold)
+        result, notes = run_subject(
+            subject_file,
+            args.artifact_threshold,
+            args.artifact_output_mode,
+            args.artifact_class_index,
+        )
         write_json(output_path, result)
 
         summary_rows.append(build_summary_row(subject, result, notes))
@@ -77,7 +94,12 @@ def find_subject_files(input_dir: Path) -> list[Path]:
     return [path for path in files if path.is_file()]
 
 
-def run_subject(input_path: Path, artifact_threshold: float) -> tuple[dict, list[str]]:
+def run_subject(
+    input_path: Path,
+    artifact_threshold: float,
+    artifact_output_mode: str,
+    artifact_class_index: int,
+) -> tuple[dict, list[str]]:
     notes: list[str] = []
     loaded = load_ppg_csv(input_path, fallback_fs=FS_HZ)
 
@@ -90,6 +112,8 @@ def run_subject(input_path: Path, artifact_threshold: float) -> tuple[dict, list
         loaded.ppg,
         loaded.fs,
         threshold=artifact_threshold,
+        artifact_output_mode=artifact_output_mode,
+        artifact_class_index=artifact_class_index,
     )
 
     cleaned_hr = None
@@ -133,6 +157,8 @@ def run_subject(input_path: Path, artifact_threshold: float) -> tuple[dict, list
         "metrics": metrics,
         "config": {
             "artifact_threshold": artifact_threshold,
+            "artifact_output_mode": artifact_output_mode,
+            "artifact_class_index": artifact_class_index,
         },
     }
     return result, notes

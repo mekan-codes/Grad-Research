@@ -17,6 +17,8 @@ from scripts.run_loso_experiment import (
     discover_subjects,
     make_loso_folds,
 )
+from src.artifact.artifact_detector import adapt_tinyppg_output
+from src.data.ppg_dalia_dataset import PPGDaLiAWindowDataset, SyntheticPPGWindowDataset
 from src.training.train_hr import build_train_val_datasets
 
 
@@ -64,6 +66,47 @@ def test_train_val_split_never_contains_held_out_subject(tmp_path: Path) -> None
     assert _subjects_in_dataset(val_dataset) <= {"S1", "S3"}
     assert "S2" not in _subjects_in_dataset(train_dataset)
     assert "S2" not in _subjects_in_dataset(val_dataset)
+
+
+def test_requested_subjects_fail_when_csv_is_missing(tmp_path: Path) -> None:
+    create_smoke_subject_csvs(tmp_path)
+    (tmp_path / "S2.csv").unlink()
+
+    with pytest.raises(FileNotFoundError, match="S2"):
+        PPGDaLiAWindowDataset(
+            data_dir=tmp_path,
+            sampling_rate_hz=64,
+            window_sec=30,
+            subjects=["S1", "S2"],
+        )
+
+
+def test_synthetic_dataset_is_deterministic_per_index() -> None:
+    dataset = SyntheticPPGWindowDataset(num_samples=3, sampling_rate_hz=8, window_sec=2, seed=123)
+
+    first = dataset[0]["ppg"]
+    second = dataset[0]["ppg"]
+
+    assert torch.equal(first, second)
+
+
+def test_tinyppg_adapter_handles_time_last_class_layout() -> None:
+    logits = torch.tensor(
+        [
+            [[0.0, 2.0], [3.0, 0.0], [0.0, 2.0]],
+            [[2.0, 0.0], [0.0, 2.0], [2.0, 0.0]],
+        ]
+    )
+
+    probability = adapt_tinyppg_output(
+        logits,
+        target_length=3,
+        artifact_output_mode="logits",
+        artifact_class_index=1,
+    )
+
+    assert probability.shape == (2, 3)
+    assert probability[0, 0] > probability[0, 1]
 
 
 def test_prediction_rows_put_raw_and_tinyppg_on_same_windows() -> None:

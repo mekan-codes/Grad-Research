@@ -46,6 +46,22 @@ def test_threshold_calibration_returns_json_like_output() -> None:
     assert all("mean_percent_removed" in row for row in result["thresholds"])
 
 
+def test_threshold_calibration_respects_warning_limits() -> None:
+    samples = [{"ppg": torch.zeros(16), "hr_label": 70.0}]
+
+    result = calibrate_artifact_thresholds(
+        artifact_detector=LinearProbabilityDetector(),
+        samples=samples,
+        thresholds=[0.5],
+        cropper_config=CropperConfig(mode="crop", min_output_samples=1),
+        warn_mean_removed_above=10.0,
+        warn_full_crop_above=100.0,
+        warn_too_short_above=100.0,
+    )
+
+    assert any("mean removed is high" in warning for warning in result["warnings"])
+
+
 def test_cropper_empty_fallback_keeps_valid_tensor_when_requested() -> None:
     result = crop_artifact_regions(
         torch.arange(5, dtype=torch.float32),
@@ -55,4 +71,3 @@ def test_cropper_empty_fallback_keeps_valid_tensor_when_requested() -> None:
 
     assert result.signal.tolist() == [0, 1, 2, 3, 4]
     assert result.metadata.all_noisy is True
-

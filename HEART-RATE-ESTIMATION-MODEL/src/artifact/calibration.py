@@ -55,6 +55,9 @@ def calibrate_artifact_thresholds(
     device: str | torch.device = "cpu",
     max_windows: int | None = None,
     output_path: str | Path | None = None,
+    warn_mean_removed_above: float = 70.0,
+    warn_full_crop_above: float = 20.0,
+    warn_too_short_above: float = 20.0,
 ) -> dict[str, Any]:
     """Evaluate crop statistics across thresholds without training."""
 
@@ -122,7 +125,12 @@ def calibrate_artifact_thresholds(
     result = {
         "thresholds": per_threshold,
         "windows_evaluated": n_windows,
-        "warnings": threshold_warnings(per_threshold),
+        "warnings": threshold_warnings(
+            per_threshold,
+            mean_removed_above=warn_mean_removed_above,
+            full_crop_above=warn_full_crop_above,
+            too_short_above=warn_too_short_above,
+        ),
     }
     if output_path is not None:
         save_calibration_result(result, output_path)
@@ -155,4 +163,3 @@ def save_calibration_result(result: dict[str, Any], output_path: str | Path) -> 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     return path
-

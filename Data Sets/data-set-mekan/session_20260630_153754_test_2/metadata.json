@@ -1,0 +1,50 @@
+{
+  "session_id": "session_20260630_153754_test_2",
+  "subject_id": "test 2",
+  "activity_label": "rest",
+  "notes": "",
+  "start_time_unix_ms": 1782801474929,
+  "stop_time_unix_ms": 1782801516279,
+  "phone_model": "samsung SM-A245F",
+  "watch_model": null,
+  "polar_device_id": null,
+  "app_version": "0.1.0",
+  "watch_ppg_target_hz": 25,
+  "watch_imu_target_hz": 25,
+  "watch_ppg_hz": 25,
+  "watch_imu_hz": 25,
+  "polar_ecg_hz": null,
+  "polar_hr_enabled": true,
+  "polar_rr_enabled": true,
+  "samsung_sensor_sdk_available": false,
+  "polar_sdk_available": true,
+  "watch_started": false,
+  "watch_stopped": false,
+  "polar_started": false,
+  "polar_stopped": true,
+  "prepared_session_file": "prepared_session.csv",
+  "prepared_session_generated": true,
+  "prepared_session_row_count": 0,
+  "prepared_session_note": "prepared_session.csv is derived from raw CSV files using approximate nearest timestamp alignment for quick ML ingestion. Raw CSV files remain authoritative.",
+  "stream_started_flags": {
+    "watch": false,
+    "polar": false
+  },
+  "stream_stopped_flags": {
+    "watch": false,
+    "polar": true
+  },
+  "sample_counts": {
+    "watch_ppg": 0,
+    "watch_imu": 0,
+    "polar_ecg": 0,
+    "polar_hr": 0,
+    "polar_acc": 0
+  },
+  "errors_warnings": [
+    "Polar not found",
+    "Polar H10 not connected",
+    "Timed out waiting for WATCH_DONE",
+    "prepared_session.csv has zero rows because watch_ppg.csv has no green PPG rows"
+  ]
+}

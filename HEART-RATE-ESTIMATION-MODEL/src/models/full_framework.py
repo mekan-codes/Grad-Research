@@ -57,6 +57,11 @@ class FullPPGHRFramework(nn.Module):
             valid_mask = valid_mask.unsqueeze(0)
         elif valid_mask.ndim == 3 and valid_mask.shape[1] == 1:
             valid_mask = valid_mask[:, 0, :]
+        if valid_mask.shape != padded_ppg.shape:
+            raise ValueError(
+                f"valid_mask shape {tuple(valid_mask.shape)} does not match "
+                f"padded_ppg shape {tuple(padded_ppg.shape)}"
+            )
         detection = self.artifact_detector(padded_ppg, valid_mask)
         if not isinstance(detection, ArtifactDetectionResult):
             detection = _coerce_detection_result(detection)
@@ -94,7 +99,14 @@ FullFramework = FullPPGHRFramework
 
 
 def build_hr_model(config: dict[str, Any]) -> nn.Module:
-    name = str(config.get("name", "hr_estimator"))
+    raw_name = str(config.get("name", config.get("type", "hr_estimator")))
+    aliases = {
+        "simple_cnn": "hr_estimator",
+        "hr_estimator": "hr_estimator",
+        "robust_cnn_gru": "robust_hr_estimator",
+        "robust_hr_estimator": "robust_hr_estimator",
+    }
+    name = aliases.get(raw_name, raw_name)
     hidden = int(config.get("hidden_channels", 64))
     dropout = float(config.get("dropout", 0.1))
     if name == "robust_hr_estimator":

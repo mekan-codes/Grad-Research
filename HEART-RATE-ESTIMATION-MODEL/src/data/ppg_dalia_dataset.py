@@ -130,9 +130,14 @@ class PPGDaLiAWindowDataset(Dataset):
         if not self.data_dir.exists():
             return []
         if subjects:
-            wanted = {subject.upper().removesuffix(".CSV") for subject in subjects}
+            wanted = _normalize_subjects(subjects)
             paths = [self.data_dir / f"{subject}.csv" for subject in wanted]
-            return [path for path in paths if path.exists()]
+            missing = [subject for subject, path in zip(wanted, paths) if not path.exists()]
+            if missing:
+                raise FileNotFoundError(
+                    f"Prepared CSV(s) not found in {self.data_dir}: {', '.join(missing)}"
+                )
+            return paths
         return sorted(self.data_dir.glob("*.csv"), key=lambda path: _subject_sort_key(path.stem))
 
 
@@ -149,14 +154,16 @@ class SyntheticPPGWindowDataset(Dataset):
         self.num_samples = int(num_samples)
         self.fs = float(sampling_rate_hz)
         self.window_samples = int(round(window_sec * sampling_rate_hz))
-        self.rng = np.random.default_rng(seed)
-        self.labels = self.rng.uniform(55.0, 125.0, size=self.num_samples).astype(np.float32)
+        self.seed = int(seed)
+        rng = np.random.default_rng(self.seed)
+        self.labels = rng.uniform(55.0, 125.0, size=self.num_samples).astype(np.float32)
 
     def __len__(self) -> int:
         return self.num_samples
 
     def __getitem__(self, index: int) -> dict[str, Any]:
         hr = float(self.labels[index])
+        rng = np.random.default_rng(self.seed + int(index) + 1)
         t = np.arange(self.window_samples, dtype=float) / self.fs
         freq = hr / 60.0
         waveform = (
@@ -164,12 +171,12 @@ class SyntheticPPGWindowDataset(Dataset):
             + 0.35 * np.sin(4.0 * np.pi * freq * t + 0.3)
             + 0.05 * np.sin(2.0 * np.pi * 0.2 * t)
         )
-        noise = self.rng.normal(0.0, 0.08, size=t.shape)
+        noise = rng.normal(0.0, 0.08, size=t.shape)
         ppg = waveform + noise
         if index % 4 == 0:
             start = self.window_samples // 3
             stop = min(self.window_samples, start + self.window_samples // 8)
-            ppg[start:stop] += self.rng.normal(0.0, 1.0, size=stop - start)
+            ppg[start:stop] += rng.normal(0.0, 1.0, size=stop - start)
         ppg = (ppg - np.mean(ppg)) / (np.std(ppg) + 1e-8)
         return {
             "ppg": torch.tensor(ppg, dtype=torch.float32),
@@ -188,3 +195,15 @@ def _subject_sort_key(subject: str) -> tuple[int, str]:
         return int(text.lstrip("S")), text
     except ValueError:
         return 9999, text
+
+
+def _normalize_subjects(subjects: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for subject in subjects:
+        text = str(subject).strip().upper().removesuffix(".CSV")
+        if not text or text in seen:
+            continue
+        normalized.append(text)
+        seen.add(text)
+    return normalized

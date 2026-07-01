@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+import pytest
 
 from src.artifact.artifact_detector import ArtifactDetectionResult
 from src.artifact.cropper import ArtifactCropper, CropperConfig
@@ -38,3 +39,13 @@ def test_full_framework_forward_pass_runs_on_dummy_data() -> None:
     assert output["cropped_signal"].shape[0] == 2
     assert output["cropping_metadata"][0]["cropped_length"] == 118
 
+
+def test_full_framework_rejects_mismatched_valid_mask() -> None:
+    framework = FullPPGHRFramework(
+        artifact_detector=DummyArtifactDetector(),
+        cropper=ArtifactCropper(CropperConfig(mode="crop", min_clean_samples=1)),
+        hr_model=HREstimator(hidden_channels=32, dropout=0.0),
+    )
+
+    with pytest.raises(ValueError, match="valid_mask shape"):
+        framework(torch.randn(2, 128), torch.ones(2, 64, dtype=torch.bool))

@@ -108,7 +108,12 @@ def adapt_tinyppg_output(
     """
 
     tensor = _extract_segmentation_tensor(output)
-    tensor, already_probability = _normalize_shape(tensor, artifact_output_mode, artifact_class_index)
+    tensor, already_probability = _normalize_shape(
+        tensor,
+        artifact_output_mode,
+        artifact_class_index,
+        target_length=target_length,
+    )
 
     if tensor.shape[-1] != target_length:
         tensor = F.interpolate(
@@ -122,37 +127,64 @@ def adapt_tinyppg_output(
     return torch.nan_to_num(probability, nan=0.0, posinf=1.0, neginf=0.0).clamp(0.0, 1.0)
 
 
-def _normalize_shape(tensor: torch.Tensor, mode: str, artifact_class_index: int) -> tuple[torch.Tensor, bool]:
+def _normalize_shape(
+    tensor: torch.Tensor,
+    mode: str,
+    artifact_class_index: int,
+    target_length: int,
+) -> tuple[torch.Tensor, bool]:
     if tensor.ndim == 1:
         return tensor.unsqueeze(0), False
     if tensor.ndim == 2:
         return tensor, False
     if tensor.ndim == 3:
-        if tensor.shape[1] == 1:
+        if tensor.shape[1] == 1 and tensor.shape[-1] != 1:
             return tensor[:, 0, :], False
-        if tensor.shape[1] >= 2:
-            if mode not in {"logits", "class_index"}:
-                raise TinyPPGOutputError(
-                    "TinyPPG returned multiple channel outputs. Set "
-                    "artifact_output_mode to 'logits' or 'class_index'."
-            )
-            class_index = max(0, min(int(artifact_class_index), tensor.shape[1] - 1))
-            if mode == "logits":
-                return torch.softmax(tensor, dim=1)[:, class_index, :], True
-            return tensor[:, class_index, :], False
         if tensor.shape[-1] == 1:
             return tensor[..., 0], False
-        if tensor.shape[-1] >= 2:
-            if mode not in {"logits", "class_index"}:
-                raise TinyPPGOutputError(
-                    "TinyPPG returned multiple class outputs. Set "
-                    "artifact_output_mode to 'logits' or 'class_index'."
-            )
-            class_index = max(0, min(int(artifact_class_index), tensor.shape[-1] - 1))
-            if mode == "logits":
-                return torch.softmax(tensor, dim=-1)[..., class_index], True
-            return tensor[..., class_index], False
+
+        channel_first = tensor.shape[-1] == int(target_length) and tensor.shape[1] != int(target_length)
+        time_first = tensor.shape[1] == int(target_length) and tensor.shape[-1] != int(target_length)
+        if channel_first and tensor.shape[1] >= 2:
+            return _select_class_channel(tensor, dim=1, mode=mode, artifact_class_index=artifact_class_index)
+        if time_first and tensor.shape[-1] >= 2:
+            return _select_class_channel(tensor, dim=-1, mode=mode, artifact_class_index=artifact_class_index)
+
+        if mode in {"logits", "class_index"}:
+            if tensor.shape[1] < tensor.shape[-1]:
+                return _select_class_channel(tensor, dim=1, mode=mode, artifact_class_index=artifact_class_index)
+            if tensor.shape[-1] < tensor.shape[1]:
+                return _select_class_channel(tensor, dim=-1, mode=mode, artifact_class_index=artifact_class_index)
+
+        raise TinyPPGOutputError(
+            "Could not infer TinyPPG output layout for shape "
+            f"{tuple(tensor.shape)} and target_length={target_length}. Expected [B,1,T], "
+            "[B,T,1], [B,C,T], or [B,T,C]."
+        )
     raise TinyPPGOutputError(f"Unsupported TinyPPG tensor shape: {tuple(tensor.shape)}")
+
+
+def _select_class_channel(
+    tensor: torch.Tensor,
+    dim: int,
+    mode: str,
+    artifact_class_index: int,
+) -> tuple[torch.Tensor, bool]:
+    if mode not in {"logits", "class_index"}:
+        raise TinyPPGOutputError(
+            "TinyPPG returned multiple class outputs. Set "
+            "artifact_output_mode to 'logits' or 'class_index'."
+        )
+    axis = dim if dim >= 0 else tensor.ndim + dim
+    class_count = tensor.shape[axis]
+    class_index = max(0, min(int(artifact_class_index), class_count - 1))
+    if mode == "logits":
+        tensor = torch.softmax(tensor, dim=dim)
+        already_probability = True
+    else:
+        already_probability = False
+    selected = tensor.select(dim=dim, index=class_index)
+    return selected, already_probability
 
 
 def _apply_output_mode(tensor: torch.Tensor, mode: str, already_probability: bool = False) -> torch.Tensor:

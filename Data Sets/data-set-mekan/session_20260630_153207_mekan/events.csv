@@ -1,0 +1,5 @@
+session_id,timestamp_unix_ms,elapsed_realtime_ns,event_type,event_label,notes
+session_20260630_153207_mekan,1782801127942,69465065222716,SESSION_CREATED,rest,Test 1
+session_20260630_153207_mekan,1782801128347,69465077423024,START,rest,Test 1
+session_20260630_153207_mekan,1782801229719,69566448951261,STOP_REQUESTED,rest,Test 1
+session_20260630_153207_mekan,1782801239786,69576515808800,STOP_COMPLETE,rest,watch_done=false

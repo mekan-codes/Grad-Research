@@ -1,0 +1,7 @@
+session_id,timestamp_unix_ms,elapsed_realtime_ns,event_type,event_label,notes
+session_20260630_164702_test_3,1782805622325,73959265445132,SESSION_CREATED,running,
+session_20260630_164702_test_3,1782805622541,73959270972439,START,running,
+session_20260630_164702_test_3,1782805639070,73975800168210,WATCH_STARTED,watch,Watch IMU active; Samsung PPG pending
+session_20260630_164702_test_3,1782805704456,74041185692137,STOP_REQUESTED,running,
+session_20260630_164702_test_3,1782805705409,74042138799521,WATCH_DONE,watch,Watch flushed remaining samples
+session_20260630_164702_test_3,1782805705418,74042148583291,STOP_COMPLETE,running,watch_done=true

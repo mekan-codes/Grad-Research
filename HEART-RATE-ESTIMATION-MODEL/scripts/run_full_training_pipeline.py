@@ -277,6 +277,9 @@ def _run_calibration(config: dict[str, Any], device: torch.device, metrics_dir: 
         device=device,
         max_windows=calib_cfg.get("max_windows"),
         output_path=metrics_dir / "artifact_threshold_sweep.json",
+        warn_mean_removed_above=float(calib_cfg.get("warn_mean_removed_above", 70.0)),
+        warn_full_crop_above=float(calib_cfg.get("warn_full_crop_above", 20.0)),
+        warn_too_short_above=float(calib_cfg.get("warn_too_short_above", 20.0)),
     )
     for warning in result.get("warnings", []):
         logger.warning(warning)

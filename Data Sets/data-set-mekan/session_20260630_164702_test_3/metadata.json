@@ -1,0 +1,50 @@
+{
+  "session_id": "session_20260630_164702_test_3",
+  "subject_id": "test 3",
+  "activity_label": "running",
+  "notes": "",
+  "start_time_unix_ms": 1782805622325,
+  "stop_time_unix_ms": 1782805705419,
+  "phone_model": "samsung SM-A245F",
+  "watch_model": "SM-R910",
+  "polar_device_id": null,
+  "app_version": "0.1.0",
+  "watch_ppg_target_hz": 25,
+  "watch_imu_target_hz": 25,
+  "watch_ppg_hz": 25,
+  "watch_imu_hz": 25,
+  "polar_ecg_hz": null,
+  "polar_hr_enabled": true,
+  "polar_rr_enabled": true,
+  "samsung_sensor_sdk_available": true,
+  "polar_sdk_available": true,
+  "watch_started": true,
+  "watch_stopped": true,
+  "polar_started": false,
+  "polar_stopped": true,
+  "prepared_session_file": "prepared_session.csv",
+  "prepared_session_generated": true,
+  "prepared_session_row_count": 0,
+  "prepared_session_note": "prepared_session.csv is derived from raw CSV files using approximate nearest timestamp alignment for quick ML ingestion. Raw CSV files remain authoritative.",
+  "stream_started_flags": {
+    "watch": true,
+    "polar": false
+  },
+  "stream_stopped_flags": {
+    "watch": true,
+    "polar": true
+  },
+  "sample_counts": {
+    "watch_ppg": 0,
+    "watch_imu": 25,
+    "polar_ecg": 0,
+    "polar_hr": 0,
+    "polar_acc": 0
+  },
+  "errors_warnings": [
+    "Polar not found",
+    "Polar H10 not connected",
+    "foreground service failed: Starting FGS with type connectedDevice callerApp=ProcessRecord{fa8985b 31233:com.tinyppgcollector\/u0a181} targetSDK=36 requires permissions: all of the permissions allOf=true [android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE] any of the permissions allOf=false [android.permission.BLUETOOTH_ADVERTISE, android.permission.BLUETOOTH_CONNECT, android.permission.BLUETOOTH_SCAN, android.permission.CHANGE_NETWORK_STATE, android.permission.CHANGE_WIFI_STATE, android.permission.CHANGE_WIFI_MULTICAST_STATE, android.permission.NFC, android.permission.TRANSMIT_IR, android.permission.UWB_RANGING, android.permission.RANGING, USB Device, USB Accessory] ",
+    "prepared_session.csv has zero rows because watch_ppg.csv has no green PPG rows"
+  ]
+}

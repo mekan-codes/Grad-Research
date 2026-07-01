@@ -49,6 +49,18 @@ def parse_args() -> argparse.Namespace:
         help="Tiny-PPG artifact probability threshold.",
     )
     parser.add_argument(
+        "--artifact-output-mode",
+        default="artifact_probability",
+        choices=("artifact_probability", "clean_probability", "logits", "class_index"),
+        help="How to interpret TinyPPG segmentation output.",
+    )
+    parser.add_argument(
+        "--artifact-class-index",
+        type=int,
+        default=1,
+        help="Class index to use when TinyPPG returns class channels.",
+    )
+    parser.add_argument(
         "--no-kid",
         action="store_true",
         help="Skip KID-PPG and use the classical signal-processing estimator.",
@@ -77,6 +89,8 @@ def main() -> int:
         tiny_ppg_dir=args.tiny_ppg_dir,
         checkpoint_path=args.tiny_ppg_checkpoint,
         threshold=args.artifact_threshold,
+        artifact_output_mode=args.artifact_output_mode,
+        artifact_class_index=args.artifact_class_index,
     )
 
     cleaned_hr = None
@@ -132,4 +146,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

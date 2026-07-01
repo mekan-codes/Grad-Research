@@ -17,7 +17,7 @@ from src.artifact.cropper import ArtifactCropper, CropperConfig
 from src.artifact.tinyppg_wrapper import load_tinyppg
 from src.data.preprocessing import config_from_mapping, preprocess_ppg_window
 from src.data_loader import load_ppg_csv
-from src.utils.config import load_config
+from src.utils.config import load_config, normalize_config_paths
 
 
 def parse_args() -> argparse.Namespace:
@@ -32,7 +32,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    config = load_config(args.config)
+    config = normalize_config_paths(load_config(args.config))
     ppg, fs, source = _load_or_synthetic(args.input, args.fs, config)
     preprocess_config = config_from_mapping(config.get("preprocessing", {}), fs)
     clean_input = preprocess_ppg_window(ppg, preprocess_config)

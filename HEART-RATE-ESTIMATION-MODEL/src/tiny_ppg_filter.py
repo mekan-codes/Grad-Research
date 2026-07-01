@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from .artifact.artifact_detector import adapt_tinyppg_output
 from .metrics import percent_removed
 from .utils import interpolate_nans, zscore
 
@@ -39,10 +40,11 @@ def apply_tiny_ppg_filter(
     tiny_ppg_dir: str | Path | None = None,
     checkpoint_path: str | Path | None = None,
     threshold: float = 0.5,
+    artifact_output_mode: str = "artifact_probability",
+    artifact_class_index: int = 1,
 ) -> TinyPPGResult:
     try:
         import torch
-        import torch.nn.functional as torch_functional
     except Exception as exc:
         return _unavailable(f"PyTorch import failed: {exc}")
 
@@ -83,20 +85,12 @@ def apply_tiny_ppg_filter(
                 segment = zscore(filled[start:stop])
                 tensor = torch.from_numpy(segment.astype(np.float32)[None, None, :])
                 output = model(tensor)
-                if isinstance(output, dict):
-                    output = output.get("seg")
-                if output is None:
-                    raise RuntimeError("Tiny-PPG model did not return a segmentation output")
-
-                if output.shape[-1] != segment.size:
-                    output = torch_functional.interpolate(
-                        output,
-                        size=segment.size,
-                        mode="linear",
-                        align_corners=False,
-                    )
-
-                probs = output.detach().cpu().numpy().reshape(-1)
+                probs = adapt_tinyppg_output(
+                    output,
+                    target_length=segment.size,
+                    artifact_output_mode=artifact_output_mode,
+                    artifact_class_index=artifact_class_index,
+                ).squeeze(0).detach().cpu().numpy()
                 probabilities[start:stop] += probs[: stop - start]
                 counts[start:stop] += 1.0
     except Exception as exc:
@@ -120,6 +114,8 @@ def apply_tiny_ppg_filter(
             "model_path": str(model_path),
             "checkpoint_path": str(checkpoint),
             "threshold": threshold,
+            "artifact_output_mode": artifact_output_mode,
+            "artifact_class_index": artifact_class_index,
             "segments": len(segments),
         },
     )
